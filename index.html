@@ -1,0 +1,2563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#050B16" />
+<title>Choir Attendance</title>
+
+<!-- QR generation + scanning libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<!-- Chart.js for reports -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+/* ============================================================
+   DESIGN TOKENS
+   ============================================================ */
+:root{
+  --bg:#050B16;
+  --card:#0D1728;
+  --card-2:#111F35;
+  --cyan:#00E5FF;
+  --blue:#3B82F6;
+  --purple:#A855F7;
+  --green:#22C55E;
+  --red:#EF4444;
+  --yellow:#F59E0B;
+  --text:#E6EEF8;
+  --muted:#8DA0BC;
+  --border:rgba(255,255,255,0.07);
+  --grad:linear-gradient(135deg,#00E5FF 0%,#3B82F6 50%,#A855F7 100%);
+  --grad-soft:linear-gradient(135deg,rgba(0,229,255,.15),rgba(168,85,247,.15));
+  --shadow:0 10px 40px rgba(0,0,0,.45);
+  --radius:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;
+  background:var(--bg);color:var(--text);
+  min-height:100vh;overflow-x:hidden;
+  font-size:15px;line-height:1.5;
+}
+button{font-family:inherit;cursor:pointer;border:none;outline:none}
+input,select,textarea{font-family:inherit;outline:none}
+a{color:var(--cyan);text-decoration:none}
+
+/* ============================================================
+   BACKGROUND GLOW
+   ============================================================ */
+body::before{
+  content:'';position:fixed;inset:0;z-index:-1;
+  background:
+    radial-gradient(900px 600px at 10% -10%,rgba(0,229,255,.12),transparent 60%),
+    radial-gradient(900px 600px at 110% 110%,rgba(168,85,247,.14),transparent 60%),
+    radial-gradient(700px 500px at 50% 50%,rgba(59,130,246,.05),transparent 70%);
+  pointer-events:none;
+}
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+.hidden{display:none !important}
+.glass{
+  background:linear-gradient(160deg,rgba(17,31,53,.85),rgba(13,23,40,.85));
+  border:1px solid var(--border);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:12px 18px;border-radius:12px;font-weight:600;font-size:14px;
+  transition:transform .15s ease,box-shadow .2s ease,opacity .2s ease;
+  background:var(--card-2);color:var(--text);border:1px solid var(--border);
+}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn-primary{background:var(--grad);color:#03121f;box-shadow:0 8px 24px rgba(0,229,255,.25)}
+.btn-primary:hover{box-shadow:0 10px 30px rgba(0,229,255,.4)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-ghost{background:transparent;border:1px solid var(--border)}
+.btn-sm{padding:8px 12px;font-size:13px;border-radius:10px}
+.btn-block{width:100%}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-size:13px;color:var(--muted);font-weight:500}
+.field input,.field select,.field textarea{
+  padding:12px 14px;border-radius:12px;border:1px solid var(--border);
+  background:rgba(5,11,22,.6);color:var(--text);font-size:15px;width:100%;
+  transition:border-color .2s,box-shadow .2s;
+}
+.field input:focus,.field select:focus{
+  border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,229,255,.15);
+}
+.field input::placeholder{color:#5B6B85}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row > *{flex:1;min-width:140px}
+.badge{
+  display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;
+}
+.badge-green{background:rgba(34,197,94,.15);color:var(--green)}
+.badge-yellow{background:rgba(245,158,11,.15);color:var(--yellow)}
+.badge-red{background:rgba(239,68,68,.15);color:var(--red)}
+.badge-blue{background:rgba(59,130,246,.15);color:var(--blue)}
+.badge-cyan{background:rgba(0,229,255,.15);color:var(--cyan)}
+.badge-purple{background:rgba(168,85,247,.15);color:var(--purple)}
+.muted{color:var(--muted)}
+.center{text-align:center}
+.mt-1{margin-top:8px}.mt-2{margin-top:16px}.mt-3{margin-top:24px}
+.spinner{
+  width:20px;height:20px;border:3px solid rgba(255,255,255,.15);
+  border-top-color:var(--cyan);border-radius:50%;
+  animation:spin .8s linear infinite;display:inline-block;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ============================================================
+   AUTH SCREEN
+   ============================================================ */
+#authScreen{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding:20px;
+}
+.auth-card{
+  width:100%;max-width:420px;padding:36px 28px;
+  animation:fadeUp .5s ease;
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.logo-circle{
+  width:74px;height:74px;border-radius:24px;margin:0 auto 18px;
+  background:var(--grad);display:flex;align-items:center;justify-content:center;
+  font-size:38px;box-shadow:0 12px 40px rgba(0,229,255,.35);
+}
+.auth-title{font-size:26px;font-weight:800;text-align:center;letter-spacing:-.5px}
+.auth-sub{text-align:center;color:var(--muted);font-size:13px;margin-top:4px;margin-bottom:26px}
+.auth-links{display:flex;justify-content:space-between;margin-top:14px;font-size:13px}
+.alert{
+  padding:12px 14px;border-radius:12px;font-size:13px;margin-bottom:14px;
+  display:flex;gap:8px;align-items:flex-start;animation:fadeUp .3s ease;
+}
+.alert-error{background:rgba(239,68,68,.12);color:#FCA5A5;border:1px solid rgba(239,68,68,.3)}
+.alert-success{background:rgba(34,197,94,.12);color:#86EFAC;border:1px solid rgba(34,197,94,.3)}
+.alert-info{background:rgba(0,229,255,.1);color:#7DD3FC;border:1px solid rgba(0,229,255,.25)}
+.alert-warn{background:rgba(245,158,11,.12);color:#FCD34D;border:1px solid rgba(245,158,11,.3)}
+
+/* ============================================================
+   APP SHELL
+   ============================================================ */
+#appShell{min-height:100vh;display:flex;flex-direction:column}
+.topbar{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;background:rgba(5,11,22,.85);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border);
+}
+.topbar .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:16px}
+.topbar .brand .dot{
+  width:32px;height:32px;border-radius:10px;background:var(--grad);
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+}
+.avatar{
+  width:38px;height:38px;border-radius:50%;background:var(--grad);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;color:#03121f;font-size:14px;cursor:pointer;
+  border:2px solid rgba(255,255,255,.1);
+}
+.main-layout{display:flex;flex:1;min-height:0}
+
+/* Sidebar (desktop) */
+.sidebar{
+  width:250px;flex-shrink:0;padding:18px 12px;
+  border-right:1px solid var(--border);background:rgba(13,23,40,.4);
+  display:none;
+}
+.sidebar nav{display:flex;flex-direction:column;gap:4px}
+.nav-item{
+  display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;
+  color:var(--muted);font-weight:500;font-size:14px;cursor:pointer;
+  transition:background .2s,color .2s;
+  background:transparent;text-align:left;width:100%;
+}
+.nav-item:hover{background:rgba(255,255,255,.04);color:var(--text)}
+.nav-item.active{background:var(--grad-soft);color:var(--cyan);font-weight:600}
+.nav-item .ico{font-size:18px;width:22px;text-align:center}
+
+/* Content */
+.content{flex:1;padding:18px;max-width:1200px;width:100%;margin:0 auto;padding-bottom:100px}
+.page-head{margin-bottom:20px}
+.page-head h1{font-size:22px;font-weight:800;letter-spacing:-.4px}
+.page-head p{color:var(--muted);font-size:13px;margin-top:4px}
+
+/* Bottom nav (mobile) */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;z-index:60;
+  display:flex;justify-content:space-around;align-items:center;
+  background:rgba(13,23,40,.95);backdrop-filter:blur(14px);
+  border-top:1px solid var(--border);padding:8px 4px 10px;
+  padding-bottom:calc(10px + env(safe-area-inset-bottom));
+}
+.bnav-item{
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+  color:var(--muted);font-size:10px;font-weight:500;padding:6px 10px;
+  background:transparent;flex:1;border-radius:12px;
+}
+.bnav-item .ico{font-size:20px}
+.bnav-item.active{color:var(--cyan)}
+
+/* ============================================================
+   CARDS / GRID
+   ============================================================ */
+.grid{display:grid;gap:14px}
+.grid-stats{grid-template-columns:repeat(2,1fr)}
+.grid-3{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+@media(min-width:700px){.grid-stats{grid-template-columns:repeat(4,1fr)}}
+
+.stat-card{padding:18px;position:relative;overflow:hidden}
+.stat-card .ico{
+  width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  font-size:20px;margin-bottom:12px;
+}
+.stat-card .label{font-size:12px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.4px}
+.stat-card .value{font-size:26px;font-weight:800;margin-top:4px;letter-spacing:-.5px}
+.stat-card .sub{font-size:12px;color:var(--muted);margin-top:2px}
+
+.card{padding:18px}
+.card h3{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card h3 .ico{font-size:18px}
+
+/* Action tiles */
+.tile{
+  padding:20px;border-radius:16px;cursor:pointer;position:relative;overflow:hidden;
+  background:linear-gradient(160deg,rgba(17,31,53,.9),rgba(13,23,40,.9));
+  border:1px solid var(--border);transition:transform .2s,border-color .2s;
+  text-align:left;color:var(--text);width:100%;
+}
+.tile:hover{transform:translateY(-2px);border-color:rgba(0,229,255,.3)}
+.tile .ico{font-size:26px;margin-bottom:10px}
+.tile .t-title{font-weight:700;font-size:15px}
+.tile .t-sub{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* ============================================================
+   TABLES (desktop) / CARDS (mobile)
+   ============================================================ */
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.data{width:100%;border-collapse:collapse;font-size:14px}
+table.data th{
+  text-align:left;padding:12px;font-size:11px;text-transform:uppercase;
+  letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600;
+}
+table.data td{padding:12px;border-bottom:1px solid rgba(255,255,255,.04)}
+table.data tr:hover td{background:rgba(255,255,255,.02)}
+
+/* Mobile records as cards */
+.rec-card{
+  padding:14px;border-radius:14px;background:var(--card-2);border:1px solid var(--border);
+  margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;
+}
+.rec-card .rc-main{min-width:0;flex:1}
+.rec-card .rc-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rec-card .rc-meta{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* ============================================================
+   TABS
+   ============================================================ */
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;-webkit-overflow-scrolling:touch}
+.tab{
+  padding:9px 16px;border-radius:999px;font-size:13px;font-weight:600;
+  background:var(--card-2);color:var(--muted);border:1px solid var(--border);
+  white-space:nowrap;transition:all .2s;
+}
+.tab.active{background:var(--grad);color:#03121f;border-color:transparent}
+
+/* ============================================================
+   MODAL
+   ============================================================ */
+.modal-overlay{
+  position:fixed;inset:0;z-index:200;background:rgba(2,6,15,.75);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  display:flex;align-items:flex-end;justify-content:center;padding:0;
+}
+@media(min-width:600px){.modal-overlay{align-items:center;padding:20px}}
+.modal{
+  width:100%;max-width:520px;max-height:92vh;overflow-y:auto;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:22px 22px 0 0;padding:22px;animation:slideUp .3s ease;
+}
+@media(min-width:600px){.modal{border-radius:22px}}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.modal-head h2{font-size:18px;font-weight:700}
+.modal-close{
+  width:34px;height:34px;border-radius:10px;background:var(--card-2);color:var(--muted);
+  font-size:18px;display:flex;align-items:center;justify-content:center;
+}
+
+/* ============================================================
+   QR
+   ============================================================ */
+.qr-box{
+  background:#fff;padding:16px;border-radius:16px;display:inline-block;
+  box-shadow:0 10px 40px rgba(0,229,255,.25);
+}
+.qr-box img,.qr-box canvas{display:block;width:200px !important;height:200px !important}
+.countdown{
+  font-size:32px;font-weight:800;font-variant-numeric:tabular-nums;
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;letter-spacing:1px;
+}
+.countdown.expired{background:var(--red);-webkit-background-clip:text;background-clip:text}
+
+/* Fullscreen projector QR */
+#qrFullscreen{
+  position:fixed;inset:0;z-index:500;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:20px;text-align:center;
+}
+#qrFullscreen .fs-head{font-size:14px;letter-spacing:3px;color:var(--muted);font-weight:600;margin-bottom:14px}
+#qrFullscreen .fs-activity{font-size:34px;font-weight:800;letter-spacing:-.5px}
+#qrFullscreen .fs-name{font-size:18px;color:var(--muted);margin-top:4px;margin-bottom:24px}
+#qrFullscreen .fs-qr{background:#fff;padding:20px;border-radius:20px;box-shadow:0 20px 80px rgba(0,229,255,.3)}
+#qrFullscreen .fs-qr img,#qrFullscreen .fs-qr canvas{width:min(60vw,340px) !important;height:min(60vw,340px) !important}
+#qrFullscreen .fs-stats{display:flex;gap:30px;margin-top:26px}
+#qrFullscreen .fs-stat{text-align:center}
+#qrFullscreen .fs-stat .n{font-size:34px;font-weight:800}
+#qrFullscreen .fs-stat .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+#qrFullscreen .fs-timer{margin-top:22px;font-size:20px;font-weight:700}
+#qrFullscreen .fs-exit{
+  position:absolute;top:20px;right:20px;
+}
+
+/* ============================================================
+   SCANNER
+   ============================================================ */
+#scannerWrap{position:fixed;inset:0;z-index:400;background:#000;display:flex;flex-direction:column}
+#scannerWrap .sc-head{
+  padding:14px 18px;display:flex;justify-content:space-between;align-items:center;
+  background:rgba(0,0,0,.7);color:#fff;
+}
+#reader{flex:1;width:100%;position:relative}
+#reader video{object-fit:cover !important;width:100% !important;height:100% !important}
+.scan-frame{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:min(75vw,300px);height:min(75vw,300px);
+  border:3px solid var(--cyan);border-radius:24px;
+  box-shadow:0 0 0 4000px rgba(0,0,0,.5),0 0 30px rgba(0,229,255,.6);
+  pointer-events:none;
+}
+.scan-hint{
+  position:absolute;bottom:40px;left:0;right:0;text-align:center;color:#fff;
+  font-size:14px;text-shadow:0 2px 8px rgba(0,0,0,.8);
+}
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+.empty{padding:44px 20px;text-align:center}
+.empty .e-ico{font-size:52px;opacity:.6;margin-bottom:12px}
+.empty .e-title{font-weight:700;font-size:16px}
+.empty .e-sub{color:var(--muted);font-size:13px;margin-top:4px}
+
+/* Progress bars */
+.prog{height:8px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden;margin-top:8px}
+.prog > div{height:100%;background:var(--grad);border-radius:999px;transition:width .5s ease}
+
+/* Toast */
+#toast{
+  position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);
+  z-index:1000;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:600;
+  background:var(--card-2);border:1px solid var(--border);
+  opacity:0;transition:all .3s ease;pointer-events:none;max-width:90vw;text-align:center;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.success{background:rgba(34,197,94,.95);color:#fff;border-color:transparent}
+#toast.error{background:rgba(239,68,68,.95);color:#fff;border-color:transparent}
+#toast.info{background:rgba(0,229,255,.95);color:#03121f;border-color:transparent}
+
+/* ============================================================
+   DESKTOP LAYOUT
+   ============================================================ */
+@media(min-width:900px){
+  .sidebar{display:block}
+  .bottom-nav{display:none}
+  .content{padding-bottom:30px}
+  .topbar{padding:14px 26px}
+  .mobile-only{display:none !important}
+}
+@media(max-width:899px){
+  .desktop-only{display:none !important}
+}
+
+/* Section switching */
+.page{display:none;animation:fadeUp .3s ease}
+.page.active{display:block}
+
+/* Segmented control for member activity breakdown */
+.seg-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.seg-row:last-child{border-bottom:none}
+
+/* Filter bar */
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.filter-bar input,.filter-bar select{
+  padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+  background:rgba(5,11,22,.6);color:var(--text);font-size:13px;flex:1;min-width:130px;
+}
+</style>
+</head>
+<body>
+
+<!-- =========================================================
+     FIREBASE CONFIG WARNING SCREEN
+     ========================================================= -->
+<div id="configWarning" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div class="glass auth-card">
+    <div class="logo-circle">⚙️</div>
+    <h1 class="auth-title">Firebase Setup Required</h1>
+    <p class="auth-sub">Insert your Firebase configuration to continue</p>
+    <div class="alert alert-warn">
+      Open <b>index.html</b> and find <code>FIREBASE_CONFIG</code>. Replace the placeholder values with your real Firebase project credentials.
+    </div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.8">
+      Required keys:<br>
+      • apiKey<br>• authDomain<br>• projectId<br>• storageBucket<br>• messagingSenderId<br>• appId
+    </div>
+  </div>
+</div>
+
+<!-- =========================================================
+     AUTH SCREEN
+     ========================================================= -->
+<div id="authScreen" class="hidden">
+  <div class="glass auth-card">
+    <div class="logo-circle">🎵</div>
+    <h1 class="auth-title">Choir Attendance</h1>
+    <p class="auth-sub">Simple. Accurate. Connected.</p>
+
+    <div id="authAlert"></div>
+
+    <!-- LOGIN FORM -->
+    <form id="loginForm">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="email" required />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" required />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block mt-1" id="loginBtn">Sign In</button>
+      <div class="auth-links">
+        <a href="#" id="toRegister">Create Account</a>
+        <a href="#" id="toForgot">Forgot Password?</a>
+      </div>
+    </form>
+
+    <!-- REGISTER FORM -->
+    <form id="registerForm" class="hidden">
+      <div class="field">
+        <label>Full Name</label>
+        <input type="text" id="regName" placeholder="Jean Habimana" required />
+      </div>
+      <div class="field">
+        <label>Phone Number</label>
+        <input type="tel" id="regPhone" placeholder="+250 7XX XXX XXX" required />
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="regEmail" placeholder="you@example.com" required />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="regPassword" placeholder="Minimum 6 characters" required />
+      </div>
+      <div class="field">
+        <label>Confirm Password</label>
+        <input type="password" id="regConfirm" placeholder="Repeat password" required />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block mt-1" id="registerBtn">Create Account</button>
+      <div class="auth-links" style="justify-content:center">
+        <a href="#" id="toLogin">Already have an account? Sign In</a>
+      </div>
+    </form>
+
+    <!-- FORGOT FORM -->
+    <form id="forgotForm" class="hidden">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="forgotEmail" placeholder="you@example.com" required />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block mt-1" id="forgotBtn">Send Reset Link</button>
+      <div class="auth-links" style="justify-content:center">
+        <a href="#" id="toLogin2">Back to Sign In</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- =========================================================
+     APP SHELL
+     ========================================================= -->
+<div id="appShell" class="hidden">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="dot">🎵</div>
+      <span>Choir Attendance</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="topbarRole" class="badge badge-cyan desktop-only"></span>
+      <div class="avatar" id="topAvatar" title="Profile">?</div>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <nav id="sidebarNav"></nav>
+    </aside>
+
+    <!-- CONTENT -->
+    <main class="content" id="mainContent">
+      <!-- Pages injected here -->
+      <section class="page" id="page-dashboard"></section>
+      <section class="page" id="page-create"></section>
+      <section class="page" id="page-records"></section>
+      <section class="page" id="page-members"></section>
+      <section class="page" id="page-reports"></section>
+      <section class="page" id="page-myattendance"></section>
+      <section class="page" id="page-profile"></section>
+      <section class="page" id="page-settings"></section>
+    </main>
+  </div>
+
+  <!-- BOTTOM NAV (mobile) -->
+  <nav class="bottom-nav" id="bottomNav"></nav>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Modal root -->
+<div id="modalRoot"></div>
+
+<!-- =========================================================
+     MAIN SCRIPT
+     ========================================================= -->
+<script type="module">
+/* ============================================================
+   ⚠️  FIREBASE CONFIGURATION
+   Replace each value with your own Firebase project credentials.
+   Firebase Console → Project Settings → Your apps → Web app
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
+};
+
+/* ============================================================
+   IMPORTS — Firebase v10 modular SDK via CDN
+   ============================================================ */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+  createUserWithEmailAndPassword, signOut, sendPasswordResetEmail
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import {
+  getFirestore, doc, setDoc, getDoc, updateDoc, deleteDoc,
+  collection, addDoc, query, where, orderBy, onSnapshot,
+  getDocs, serverTimestamp, limit, collectionGroup
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+/* ============================================================
+   CONFIG CHECK
+   ============================================================ */
+const CONFIG_OK = FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.startsWith("YOUR_");
+if (!CONFIG_OK) {
+  document.getElementById("configWarning").classList.remove("hidden");
+} else {
+  document.getElementById("authScreen").classList.remove("hidden");
+}
+
+/* ============================================================
+   INIT FIREBASE
+   ============================================================ */
+let app, auth, db;
+if (CONFIG_OK) {
+  app  = initializeApp(FIREBASE_CONFIG);
+  auth = getAuth(app);
+  db   = getFirestore(app);
+}
+
+/* ============================================================
+   GLOBAL STATE
+   ============================================================ */
+const state = {
+  user: null,          // Firebase auth user
+  profile: null,       // Firestore users/{uid}
+  role: null,          // "admin" | "member"
+  currentPage: null,
+  unsubscribers: [],   // realtime listener cleanups
+  charts: {},          // chart instances
+  qrInstance: null,    // current QRCode instance
+  currentSession: null,// session being displayed
+  countdownTimer: null,
+  scanner: null,       // Html5Qrcode instance
+  recordsCache: { sessions:[], records:[] }
+};
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const $  = (s, el=document) => el.querySelector(s);
+const $$ = (s, el=document) => [...el.querySelectorAll(s)];
+
+function toast(msg, type="info", ms=2800){
+  const t = $("#toast");
+  t.textContent = msg;
+  t.className = "show " + type;
+  clearTimeout(t._t);
+  t._t = setTimeout(()=>{ t.className = ""; }, ms);
+}
+
+function escapeHtml(str=""){
+  return String(str).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+function fmtDate(d){
+  if (!d) return "—";
+  const dt = d instanceof Date ? d : (d.toDate ? d.toDate() : new Date(d));
+  if (isNaN(dt)) return "—";
+  return dt.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});
+}
+function fmtTime(d){
+  if (!d) return "—";
+  const dt = d instanceof Date ? d : (d.toDate ? d.toDate() : new Date(d));
+  if (isNaN(dt)) return "—";
+  return dt.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+}
+function fmtDateTime(d){ return `${fmtDate(d)} · ${fmtTime(d)}`; }
+
+function initials(name=""){
+  return name.trim().split(/\s+/).slice(0,2).map(w=>w[0]?.toUpperCase()||"").join("") || "?";
+}
+
+function activityIcon(type){
+  return { Amateraniro:"🙏", Practice:"🎵", "Choir Other Part":"🎤" }[type] || "📌";
+}
+function activityShort(type){
+  return type === "Choir Other Part" ? "Other Part" : type;
+}
+function statusBadge(status){
+  const map = {
+    Present:"badge-green", Late:"badge-yellow",
+    Excused:"badge-blue", Absent:"badge-red"
+  };
+  return `<span class="badge ${map[status]||"badge-cyan"}">${escapeHtml(status||"—")}</span>`;
+}
+
+function friendlyAuthError(code=""){
+  const map = {
+    "auth/invalid-email":"Please enter a valid email address.",
+    "auth/user-not-found":"No account found with that email.",
+    "auth/wrong-password":"Incorrect password. Please try again.",
+    "auth/invalid-credential":"Incorrect email or password.",
+    "auth/email-already-in-use":"That email is already registered.",
+    "auth/weak-password":"Password must be at least 6 characters.",
+    "auth/too-many-requests":"Too many attempts. Please try again later.",
+    "auth/network-request-failed":"Network error. Check your connection.",
+    "auth/missing-password":"Please enter your password.",
+    "auth/missing-email":"Please enter your email."
+  };
+  return map[code] || "Authentication failed. Please try again.";
+}
+
+function closeAllListeners(){
+  state.unsubscribers.forEach(u => { try{u();}catch(e){} });
+  state.unsubscribers = [];
+  if (state.countdownTimer){ clearInterval(state.countdownTimer); state.countdownTimer=null; }
+  Object.values(state.charts).forEach(c=>{ try{c.destroy();}catch(e){} });
+  state.charts = {};
+}
+
+/* ============================================================
+   MODAL SYSTEM
+   ============================================================ */
+function openModal(html, {onClose}={}){
+  const root = $("#modalRoot");
+  root.innerHTML = `
+    <div class="modal-overlay" id="modalOverlay">
+      <div class="modal" role="dialog" aria-modal="true">${html}</div>
+    </div>`;
+  const overlay = $("#modalOverlay");
+  overlay.addEventListener("click", e=>{
+    if (e.target === overlay) closeModal(onClose);
+  });
+  $$(".modal-close", overlay).forEach(b=>b.addEventListener("click",()=>closeModal(onClose)));
+}
+function closeModal(cb){
+  $("#modalRoot").innerHTML = "";
+  if (typeof cb === "function") cb();
+}
+
+function confirmDialog(title, message, onConfirm, confirmLabel="Confirm", danger=false){
+  openModal(`
+    <div class="modal-head">
+      <h2>${escapeHtml(title)}</h2>
+      <button class="modal-close" aria-label="Close">✕</button>
+    </div>
+    <p class="muted" style="margin-bottom:20px">${escapeHtml(message)}</p>
+    <div class="row">
+      <button class="btn btn-ghost" id="mc-cancel">Cancel</button>
+      <button class="btn ${danger?'btn-danger':'btn-primary'}" id="mc-ok">${escapeHtml(confirmLabel)}</button>
+    </div>
+  `);
+  $("#mc-cancel").onclick = ()=>closeModal();
+  $("#mc-ok").onclick = async ()=>{
+    try{ await onConfirm(); }catch(e){ console.error(e); }
+    closeModal();
+  };
+}
+
+/* ============================================================
+   AUTH FLOW
+   ============================================================ */
+// Switch between auth sub-forms
+const loginForm = $("#loginForm"), registerForm = $("#registerForm"), forgotForm = $("#forgotForm");
+function showAuthForm(which){
+  [loginForm, registerForm, forgotForm].forEach(f=>f.classList.add("hidden"));
+  which.classList.remove("hidden");
+  $("#authAlert").innerHTML = "";
+}
+$("#toRegister").onclick = e=>{ e.preventDefault(); showAuthForm(registerForm); };
+$("#toLogin").onclick    = e=>{ e.preventDefault(); showAuthForm(loginForm); };
+$("#toLogin2").onclick   = e=>{ e.preventDefault(); showAuthForm(loginForm); };
+$("#toForgot").onclick   = e=>{ e.preventDefault(); showAuthForm(forgotForm); };
+
+// Login
+loginForm.onsubmit = async (e)=>{
+  e.preventDefault();
+  const btn = $("#loginBtn");
+  btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
+  $("#authAlert").innerHTML = "";
+  try{
+    await signInWithEmailAndPassword(auth, $("#loginEmail").value.trim(), $("#loginPassword").value);
+  }catch(err){
+    $("#authAlert").innerHTML = `<div class="alert alert-error">⚠️ ${friendlyAuthError(err.code)}</div>`;
+    btn.disabled = false; btn.textContent = "Sign In";
+  }
+};
+
+// Register
+registerForm.onsubmit = async (e)=>{
+  e.preventDefault();
+  const name = $("#regName").value.trim();
+  const phone = $("#regPhone").value.trim();
+  const email = $("#regEmail").value.trim();
+  const pw = $("#regPassword").value;
+  const pw2 = $("#regConfirm").value;
+
+  if (!name || !phone || !email || !pw) return $("#authAlert").innerHTML = `<div class="alert alert-error">⚠️ Please fill in all fields.</div>`;
+  if (pw.length < 6) return $("#authAlert").innerHTML = `<div class="alert alert-error">⚠️ Password must be at least 6 characters.</div>`;
+  if (pw !== pw2)    return $("#authAlert").innerHTML = `<div class="alert alert-error">⚠️ Passwords do not match.</div>`;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return $("#authAlert").innerHTML = `<div class="alert alert-error">⚠️ Please enter a valid email.</div>`;
+
+  const btn = $("#registerBtn");
+  btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
+  $("#authAlert").innerHTML = "";
+  try{
+    const cred = await createUserWithEmailAndPassword(auth, email, pw);
+    // Create Firestore user document — role is forced to "member"
+    await setDoc(doc(db, "users", cred.user.uid), {
+      uid: cred.user.uid,
+      fullName: name,
+      phone: phone,
+      email: email,
+      role: "member",
+      createdAt: serverTimestamp()
+    });
+    $("#authAlert").innerHTML = `<div class="alert alert-success">✅ Account created successfully.</div>`;
+    // onAuthStateChanged will route them
+  }catch(err){
+    $("#authAlert").innerHTML = `<div class="alert alert-error">⚠️ ${friendlyAuthError(err.code)}</div>`;
+    btn.disabled = false; btn.textContent = "Create Account";
+  }
+};
+
+// Forgot password
+forgotForm.onsubmit = async (e)=>{
+  e.preventDefault();
+  const btn = $("#forgotBtn");
+  btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
+  $("#authAlert").innerHTML = "";
+  try{
+    await sendPasswordResetEmail(auth, $("#forgotEmail").value.trim());
+    $("#authAlert").innerHTML = `<div class="alert alert-success">✅ Password reset link sent. Check your email.</div>`;
+  }catch(err){
+    $("#authAlert").innerHTML = `<div class="alert alert-error">⚠️ ${friendlyAuthError(err.code)}</div>`;
+  }
+  btn.disabled = false; btn.textContent = "Send Reset Link";
+};
+
+// Logout
+async function logout(){
+  closeAllListeners();
+  try{ await signOut(auth); }catch(e){}
+  state.user = state.profile = state.role = null;
+}
+
+/* ============================================================
+   AUTH STATE ROUTER
+   ============================================================ */
+if (CONFIG_OK){
+  onAuthStateChanged(auth, async (user)=>{
+    closeAllListeners();
+    if (!user){
+      state.user = state.profile = state.role = null;
+      $("#authScreen").classList.remove("hidden");
+      $("#appShell").classList.add("hidden");
+      return;
+    }
+    state.user = user;
+    try{
+      // Load or create profile doc
+      const ref = doc(db, "users", user.uid);
+      let snap = await getDoc(ref);
+      if (!snap.exists()){
+        // Safety net: if registration doc creation failed
+        await setDoc(ref, {
+          uid: user.uid,
+          fullName: user.displayName || (user.email||"").split("@")[0],
+          phone: "",
+          email: user.email || "",
+          role: "member",
+          createdAt: serverTimestamp()
+        });
+        snap = await getDoc(ref);
+      }
+      state.profile = snap.data();
+      state.role = state.profile.role === "admin" ? "admin" : "member";
+
+      $("#authScreen").classList.add("hidden");
+      $("#appShell").classList.remove("hidden");
+      $("#topAvatar").textContent = initials(state.profile.fullName);
+      $("#topAvatar").onclick = ()=>navigate("profile");
+      $("#topbarRole").textContent = state.role === "admin" ? "Admin / Leader" : "Member";
+
+      buildNavigation();
+      navigate("dashboard");
+    }catch(err){
+      console.error(err);
+      toast("Failed to load your profile. Check permissions.", "error");
+    }
+  });
+}
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+const ADMIN_NAV = [
+  {id:"dashboard", label:"Dashboard",          icon:"🏠"},
+  {id:"create",    label:"Create Attendance",  icon:"➕"},
+  {id:"records",   label:"Attendance Records", icon:"📋"},
+  {id:"members",   label:"Members",            icon:"👥"},
+  {id:"reports",   label:"Reports",            icon:"📊"},
+  {id:"settings",  label:"Settings",           icon:"⚙️"},
+  {id:"profile",   label:"Profile",            icon:"👤"}
+];
+const ADMIN_BOTTOM = [
+  {id:"dashboard", label:"Home",     icon:"🏠"},
+  {id:"create",    label:"Create",   icon:"➕"},
+  {id:"records",   label:"Records",  icon:"📋"},
+  {id:"members",   label:"Members",  icon:"👥"},
+  {id:"reports",   label:"Reports",  icon:"📊"}
+];
+const MEMBER_NAV = [
+  {id:"dashboard",    label:"Dashboard",     icon:"🏠"},
+  {id:"myattendance", label:"My Attendance", icon:"📋"},
+  {id:"profile",      label:"Profile",       icon:"👤"},
+  {id:"settings",     label:"Settings",      icon:"⚙️"}
+];
+const MEMBER_BOTTOM = [
+  {id:"dashboard",    label:"Home",          icon:"🏠"},
+  {id:"scan",         label:"Scan",          icon:"📷", action:"scan"},
+  {id:"myattendance", label:"My Attendance", icon:"📋"},
+  {id:"profile",      label:"Profile",       icon:"👤"}
+];
+
+function buildNavigation(){
+  const isAdmin = state.role === "admin";
+  const sidebar = $("#sidebarNav");
+  const bottom = $("#bottomNav");
+  const navItems = isAdmin ? ADMIN_NAV : MEMBER_NAV;
+
+  sidebar.innerHTML = navItems.map(n=>`
+    <button class="nav-item" data-nav="${n.id}">
+      <span class="ico">${n.icon}</span><span>${n.label}</span>
+    </button>
+  `).join("") + `
+    <button class="nav-item" id="navLogout" style="margin-top:14px;color:#FCA5A5">
+      <span class="ico">🚪</span><span>Logout</span>
+    </button>`;
+
+  const bItems = isAdmin ? ADMIN_BOTTOM : MEMBER_BOTTOM;
+  bottom.innerHTML = bItems.map(n=>`
+    <button class="bnav-item" data-nav="${n.id}" ${n.action?`data-action="${n.action}"`:""}>
+      <span class="ico">${n.icon}</span><span>${n.label}</span>
+    </button>
+  `).join("");
+
+  $$("#sidebarNav [data-nav], #bottomNav [data-nav]").forEach(b=>{
+    b.onclick = ()=>{
+      const id = b.dataset.nav;
+      const action = b.dataset.action;
+      if (action === "scan") return openScanner();
+      if (id === "settings" && state.role !== "admin") { /* member settings is fine */ }
+      navigate(id);
+    };
+  });
+  $("#navLogout").onclick = ()=> confirmDialog("Logout","Are you sure you want to sign out?", logout, "Logout", true);
+}
+
+function setActiveNav(id){
+  $$("#sidebarNav [data-nav], #bottomNav [data-nav]").forEach(b=>{
+    b.classList.toggle("active", b.dataset.nav === id);
+  });
+}
+
+function navigate(pageId){
+  state.currentPage = pageId;
+  $$(".page").forEach(p=>p.classList.remove("active"));
+  const el = $("#page-" + pageId);
+  if (el) el.classList.add("active");
+  setActiveNav(pageId);
+  $("#mainContent").scrollTop = 0;
+  window.scrollTo({top:0,behavior:"instant"});
+
+  // Render page content
+  const renderers = {
+    dashboard:      state.role === "admin" ? renderAdminDashboard : renderMemberDashboard,
+    create:         state.role === "admin" ? renderCreateAttendance : null,
+    records:        state.role === "admin" ? renderAttendanceRecords : null,
+    members:        state.role === "admin" ? renderMembers : null,
+    reports:        state.role === "admin" ? renderReports : null,
+    myattendance:   renderMyAttendance,
+    profile:        renderProfile,
+    settings:       renderSettings
+  };
+  const fn = renderers[pageId];
+  if (!fn){ toast("Page not available.", "error"); return navigate(state.role==="admin"?"dashboard":"dashboard"); }
+  closeAllListeners();
+  fn();
+}
+
+/* ============================================================
+   ADMIN DASHBOARD
+   ============================================================ */
+async function renderAdminDashboard(){
+  const el = $("#page-dashboard");
+  const name = state.profile.fullName.split(" ")[0];
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+  el.innerHTML = `
+    <div class="page-head">
+      <h1>${greeting}, ${escapeHtml(name)} 👋</h1>
+      <p>Here is an overview of your choir's attendance.</p>
+    </div>
+
+    <div class="grid grid-stats" id="statsGrid">
+      <div class="glass stat-card">
+        <div class="ico" style="background:rgba(0,229,255,.15)">👥</div>
+        <div class="label">Members</div>
+        <div class="value" id="statMembers">—</div>
+      </div>
+      <div class="glass stat-card">
+        <div class="ico" style="background:rgba(34,197,94,.15)">✅</div>
+        <div class="label">Today's Attendance</div>
+        <div class="value" id="statToday">—</div>
+      </div>
+      <div class="glass stat-card">
+        <div class="ico" style="background:rgba(0,229,255,.15)">🙏</div>
+        <div class="label">Amateraniro</div>
+        <div class="value" id="statAmat">—</div>
+        <div class="sub">sessions</div>
+      </div>
+      <div class="glass stat-card">
+        <div class="ico" style="background:rgba(59,130,246,.15)">🎵</div>
+        <div class="label">Practice</div>
+        <div class="value" id="statPrac">—</div>
+        <div class="sub">sessions</div>
+      </div>
+      <div class="glass stat-card">
+        <div class="ico" style="background:rgba(168,85,247,.15)">🎤</div>
+        <div class="label">Other Part</div>
+        <div class="value" id="statOther">—</div>
+        <div class="sub">sessions</div>
+      </div>
+    </div>
+
+    <h2 style="font-size:16px;font-weight:700;margin:26px 0 12px">Quick Actions</h2>
+    <div class="grid grid-3">
+      <button class="tile" data-quick="Amateraniro">
+        <div class="ico">🙏</div>
+        <div class="t-title">New Amateraniro</div>
+        <div class="t-sub">Sunday / church gathering</div>
+      </button>
+      <button class="tile" data-quick="Practice">
+        <div class="ico">🎵</div>
+        <div class="t-title">New Practice</div>
+        <div class="t-sub">Choir rehearsal session</div>
+      </button>
+      <button class="tile" data-quick="Choir Other Part">
+        <div class="ico">🎤</div>
+        <div class="t-title">New Other Part</div>
+        <div class="t-sub">Meetings & other activities</div>
+      </button>
+      <button class="tile" data-quick="__records">
+        <div class="ico">📋</div>
+        <div class="t-title">View Records</div>
+        <div class="t-sub">Browse attendance history</div>
+      </button>
+      <button class="tile" data-quick="__members">
+        <div class="ico">👥</div>
+        <div class="t-title">Manage Members</div>
+        <div class="t-sub">Search & view members</div>
+      </button>
+      <button class="tile" data-quick="__reports">
+        <div class="ico">📊</div>
+        <div class="t-title">Reports</div>
+        <div class="t-sub">Statistics & insights</div>
+      </button>
+    </div>
+
+    <div class="glass card mt-3">
+      <h3><span class="ico">🕒</span> Recent Attendance</h3>
+      <div id="recentList"><div class="center" style="padding:20px"><span class="spinner"></span></div></div>
+    </div>
+  `;
+
+  // Quick actions
+  $$("[data-quick]").forEach(b=>{
+    b.onclick = ()=>{
+      const v = b.dataset.quick;
+      if (v === "__records")  return navigate("records");
+      if (v === "__members")  return navigate("members");
+      if (v === "__reports")  return navigate("reports");
+      navigate("create");
+      setTimeout(()=>{ const sel = $("#createActivity"); if (sel){ sel.value = v; } }, 50);
+    };
+  });
+
+  // Load stats
+  try{
+    // Members count
+    const usersSnap = await getDocs(query(collection(db,"users"), where("role","==","member")));
+    $("#statMembers").textContent = usersSnap.size;
+
+    // Sessions per activity
+    const sessSnap = await getDocs(collection(db,"attendanceSessions"));
+    let amat=0, prac=0, oth=0;
+    sessSnap.forEach(d=>{
+      const a = d.data().activityType;
+      if (a==="Amateraniro") amat++;
+      else if (a==="Practice") prac++;
+      else if (a==="Choir Other Part") oth++;
+    });
+    $("#statAmat").textContent  = amat;
+    $("#statPrac").textContent  = prac;
+    $("#statOther").textContent = oth;
+  }catch(e){ console.error(e); }
+
+  // Today's attendance (realtime)
+  const start = new Date(); start.setHours(0,0,0,0);
+  const end   = new Date(); end.setHours(23,59,59,999);
+  const recQ = query(
+    collectionGroup(db, "records"),
+    where("timestamp",">=",start),
+    where("timestamp","<=",end)
+  );
+  const unsub1 = onSnapshot(recQ, snap=>{
+    $("#statToday").textContent = snap.size;
+  }, err=>console.error("today count:", err));
+  state.unsubscribers.push(unsub1);
+
+  // Recent attendance list (latest 10 records)
+  const recentQ = query(collectionGroup(db,"records"), orderBy("timestamp","desc"), limit(10));
+  const unsub2 = onSnapshot(recentQ, snap=>{
+    const list = $("#recentList");
+    if (snap.empty){
+      list.innerHTML = `<div class="empty"><div class="e-ico">📋</div><div class="e-title">No attendance yet</div><div class="e-sub">Create your first attendance session.</div></div>`;
+      return;
+    }
+    list.innerHTML = snap.docs.map(d=>{
+      const r = d.data();
+      return `
+        <div class="rec-card">
+          <div class="rc-main">
+            <div class="rc-name">${escapeHtml(r.memberName||"Unknown")}</div>
+            <div class="rc-meta">${activityIcon(r.activityType)} ${escapeHtml(activityShort(r.activityType||""))} · ${fmtDateTime(r.timestamp)}</div>
+          </div>
+          ${statusBadge(r.status)}
+        </div>`;
+    }).join("");
+  }, err=>{ console.error(err);
+    $("#recentList").innerHTML = `<div class="empty"><div class="e-ico">⚠️</div><div class="e-title">Could not load</div><div class="e-sub">Check Firestore indexes.</div></div>`;
+  });
+  state.unsubscribers.push(unsub2);
+}
+
+/* ============================================================
+   MEMBER DASHBOARD
+   ============================================================ */
+async function renderMemberDashboard(){
+  const el = $("#page-dashboard");
+  const name = state.profile.fullName.split(" ")[0];
+  el.innerHTML = `
+    <div class="page-head">
+      <h1>Hello, ${escapeHtml(name)} 👋</h1>
+      <p>Scan the QR code at any session to record your attendance.</p>
+    </div>
+
+    <button class="btn btn-primary btn-block" id="scanBig" style="padding:16px;font-size:16px">
+      📷 Scan Attendance QR
+    </button>
+
+    <div class="grid grid-stats mt-3">
+      <div class="glass stat-card">
+        <div class="ico" style="background:rgba(0,229,255,.15)">📈</div>
+        <div class="label">Attendance Rate</div>
+        <div class="value" id="mRate">—</div>
+      </div>
+      <div class="glass stat-card">
+        <div class="ico" style="background:rgba(59,130,246,.15)">📅</div>
+        <div class="label">Total Sessions</div>
+        <div class="value" id="mTotal">—</div>
+      </div>
+      <div class="glass stat-card">
+        <div class="ico" style="background:rgba(34,197,94,.15)">✅</div>
+        <div class="label">Present</div>
+        <div class="value" id="mPresent">—</div>
+      </div>
+      <div class="glass stat-card">
+        <div class="ico" style="background:rgba(245,158,11,.15)">⏰</div>
+        <div class="label">Late</div>
+        <div class="value" id="mLate">—</div>
+      </div>
+    </div>
+
+    <div class="glass card mt-3">
+      <h3><span class="ico">📊</span> My Attendance</h3>
+      <div id="mBreakdown"><div class="center" style="padding:20px"><span class="spinner"></span></div></div>
+    </div>
+
+    <div class="glass card mt-3">
+      <h3><span class="ico">🕒</span> Recent Activity</h3>
+      <div id="mRecent"><div class="center" style="padding:20px"><span class="spinner"></span></div></div>
+    </div>
+  `;
+
+  $("#scanBig").onclick = openScanner;
+
+  await loadMyStats();
+}
+
+async function loadMyStats(){
+  try{
+    const uid = state.user.uid;
+    // Own records
+    const recSnap = await getDocs(query(collectionGroup(db,"records"), where("uid","==",uid)));
+    const records = recSnap.docs.map(d=>d.data());
+
+    // All sessions (to compute percentages)
+    const sessSnap = await getDocs(collection(db,"attendanceSessions"));
+    const sessions = sessSnap.docs.map(d=>({id:d.id, ...d.data()}));
+
+    // Group sessions by activity (open + closed both count)
+    const byActivity = { "Amateraniro":[], "Practice":[], "Choir Other Part":[] };
+    sessions.forEach(s=>{ if (byActivity[s.activityType]) byActivity[s.activityType].push(s); });
+
+    const recordedBySession = new Map();
+    records.forEach(r=>{
+      if (r.sessionId) recordedBySession.set(r.sessionId, r.status);
+    });
+
+    const totalPresent = records.filter(r=>r.status==="Present").length;
+    const totalLate    = records.filter(r=>r.status==="Late").length;
+    const totalSessions = sessions.length;
+    const rate = totalSessions ? Math.round(((totalPresent + totalLate) / totalSessions) * 100) : 0;
+
+    $("#mTotal").textContent = totalSessions;
+    $("#mPresent").textContent = totalPresent;
+    $("#mLate").textContent = totalLate;
+    $("#mRate").textContent = rate + "%";
+
+    // Breakdown by activity
+    const breakdown = $("#mBreakdown");
+    const activities = ["Amateraniro","Practice","Choir Other Part"];
+    breakdown.innerHTML = activities.map(a=>{
+      const total = byActivity[a].length;
+      let attended = 0;
+      byActivity[a].forEach(s=>{
+        const st = recordedBySession.get(s.id);
+        if (st === "Present" || st === "Late") attended++;
+      });
+      const pct = total ? Math.round((attended/total)*100) : 0;
+      return `
+        <div class="seg-row" style="flex-direction:column;align-items:stretch;gap:6px">
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-weight:600">${activityIcon(a)} ${escapeHtml(activityShort(a))}</span>
+            <span style="font-weight:700;color:var(--cyan)">${pct}%</span>
+          </div>
+          <div class="prog"><div style="width:${pct}%"></div></div>
+          <div class="muted" style="font-size:12px">${attended} of ${total} sessions attended</div>
+        </div>`;
+    }).join("");
+
+    // Recent activity
+    const recent = records.sort((a,b)=>{
+      const ta = a.timestamp?.toDate?.() || new Date(a.timestamp||0);
+      const tb = b.timestamp?.toDate?.() || new Date(b.timestamp||0);
+      return tb - ta;
+    }).slice(0,5);
+
+    const recentEl = $("#mRecent");
+    if (!recent.length){
+      recentEl.innerHTML = `<div class="empty"><div class="e-ico">📋</div><div class="e-title">No records yet</div><div class="e-sub">Scan a QR code to check in.</div></div>`;
+    } else {
+      recentEl.innerHTML = recent.map(r=>`
+        <div class="rec-card">
+          <div class="rc-main">
+            <div class="rc-name">${activityIcon(r.activityType)} ${escapeHtml(activityShort(r.activityType||""))}</div>
+            <div class="rc-meta">${fmtDateTime(r.timestamp)}</div>
+          </div>
+          ${statusBadge(r.status)}
+        </div>
+      `).join("");
+    }
+  }catch(e){
+    console.error(e);
+    toast("Failed to load your stats.", "error");
+  }
+}
+
+/* ============================================================
+   CREATE ATTENDANCE (ADMIN)
+   ============================================================ */
+function renderCreateAttendance(){
+  const el = $("#page-create");
+  const now = new Date();
+  const defaultDate = now.toISOString().slice(0,10);
+  const defaultTime = String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0");
+
+  el.innerHTML = `
+    <div class="page-head">
+      <h1>Create Attendance</h1>
+      <p>Generate a QR code for a new attendance session.</p>
+    </div>
+
+    <div class="glass card" style="max-width:560px">
+      <div id="createAlert"></div>
+      <div class="field">
+        <label>Activity Type</label>
+        <select id="createActivity">
+          <option value="Amateraniro">🙏 Amateraniro</option>
+          <option value="Practice">🎵 Practice</option>
+          <option value="Choir Other Part">🎤 Choir Other Part</option>
+        </select>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="createDate" value="${defaultDate}" />
+        </div>
+        <div class="field">
+          <label>Start Time</label>
+          <input type="time" id="createTime" value="${defaultTime}" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Session Name</label>
+        <input type="text" id="createName" placeholder="e.g. Sunday Morning Service" />
+      </div>
+      <div class="field">
+        <label>QR Expiration</label>
+        <select id="createExpiry">
+          <option value="15">15 minutes</option>
+          <option value="30" selected>30 minutes</option>
+          <option value="60">1 hour</option>
+          <option value="120">2 hours</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-block" id="createBtn">✨ Generate QR Code</button>
+    </div>
+  `;
+
+  $("#createBtn").onclick = createAttendanceSession;
+}
+
+async function createAttendanceSession(){
+  const activity = $("#createActivity").value;
+  const dateVal  = $("#createDate").value;
+  const timeVal  = $("#createTime").value;
+  const name     = $("#createName").value.trim();
+  const expiryMin= parseInt($("#createExpiry").value,10);
+  const alertEl  = $("#createAlert");
+
+  alertEl.innerHTML = "";
+  if (!activity || !dateVal || !timeVal || !name){
+    alertEl.innerHTML = `<div class="alert alert-error">⚠️ Please fill in all fields.</div>`;
+    return;
+  }
+
+  // Build start timestamp from date+time
+  const [y,m,d] = dateVal.split("-").map(Number);
+  const [hh,mm] = timeVal.split(":").map(Number);
+  const start = new Date(y, m-1, d, hh, mm, 0, 0);
+  const expiresAt = new Date(start.getTime() + expiryMin*60*1000);
+
+  const btn = $("#createBtn");
+  btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>`;
+
+  try{
+    const sessionRef = await addDoc(collection(db,"attendanceSessions"), {
+      activityType: activity,
+      sessionName: name,
+      date: dateVal,
+      startTime: timeVal,
+      startsAt: start,
+      expiresAt: expiresAt,
+      durationMinutes: expiryMin,
+      createdBy: state.user.uid,
+      createdByName: state.profile.fullName,
+      status: "open",
+      createdAt: serverTimestamp()
+    });
+
+    toast("Session created successfully.", "success");
+    // Show QR screen
+    showSessionQR(sessionRef.id);
+  }catch(e){
+    console.error(e);
+    alertEl.innerHTML = `<div class="alert alert-error">⚠️ Could not create session. ${e.code||""}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "✨ Generate QR Code";
+  }
+}
+
+/* ============================================================
+   QR DISPLAY (regular + fullscreen)
+   ============================================================ */
+async function showSessionQR(sessionId, {fullscreen=false}={}){
+  const snap = await getDoc(doc(db,"attendanceSessions",sessionId));
+  if (!snap.exists()){ toast("Session not found.", "error"); return; }
+  const s = { id: snap.id, ...snap.data() };
+  state.currentSession = s;
+
+  const html = sessionQRModalHTML(s, fullscreen);
+  openModal(html);
+
+  // Render QR
+  setTimeout(()=>{
+    const container = $("#qrTarget");
+    if (container){
+      container.innerHTML = "";
+      new QRCode(container, {
+        text: JSON.stringify({ sessionId: s.id }),
+        width: 200, height: 200,
+        colorDark: "#050B16", colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+  }, 30);
+
+  wireSessionActions(s, fullscreen);
+  startCountdown(s, fullscreen);
+  subscribeSessionStats(s.id);
+}
+
+function sessionQRModalHTML(s, fullscreen){
+  const activity = activityIcon(s.activityType) + " " + escapeHtml(activityShort(s.activityType).toUpperCase());
+  const dateStr  = s.date ? new Date(s.date+"T"+ (s.startTime||"00:00")).toLocaleDateString("en-GB",{day:"2-digit",month:"long",year:"numeric"}) : "—";
+
+  if (fullscreen){
+    return `
+      <div class="modal-head">
+        <h2>QR Display</h2>
+        <button class="modal-close">✕</button>
+      </div>
+      <div class="center">
+        <div style="font-size:14px;letter-spacing:3px;color:var(--muted);font-weight:700">${activity}</div>
+        <div style="font-size:22px;font-weight:800;margin-top:6px">${escapeHtml(s.sessionName)}</div>
+        <div class="muted" style="margin-top:2px">${dateStr} · ${escapeHtml(s.startTime||"")}</div>
+      </div>
+      <div class="center mt-3">
+        <div class="qr-box" id="qrTarget"></div>
+      </div>
+      <div class="center mt-3" id="qrStats">
+        <div class="row" style="justify-content:center;gap:40px">
+          <div><div style="font-size:30px;font-weight:800" id="qrPresent">0</div><div class="muted" style="font-size:11px;letter-spacing:1px">PRESENT</div></div>
+          <div><div style="font-size:30px;font-weight:800" id="qrLate">0</div><div class="muted" style="font-size:11px;letter-spacing:1px">LATE</div></div>
+        </div>
+      </div>
+      <div class="center mt-3">
+        <div class="muted" style="font-size:12px;letter-spacing:1px">EXPIRES IN</div>
+        <div class="countdown" id="qrCountdown">--:--</div>
+      </div>
+      <div class="row mt-3">
+        <button class="btn btn-ghost" id="qrFullscreenBtn">🖥 Projector Mode</button>
+        <button class="btn btn-ghost" id="qrViewBtn">📋 View Attendance</button>
+      </div>
+      <button class="btn btn-danger btn-block mt-2" id="qrCloseBtn">🔒 Close Attendance</button>
+    `;
+  }
+
+  return `
+    <div class="modal-head">
+      <h2>Attendance QR</h2>
+      <button class="modal-close">✕</button>
+    </div>
+    <div class="center">
+      <div style="font-size:13px;letter-spacing:2px;color:var(--muted);font-weight:700">${activity}</div>
+      <div style="font-size:20px;font-weight:800;margin-top:6px">${escapeHtml(s.sessionName)}</div>
+      <div class="muted" style="margin-top:2px">${dateStr} · ${escapeHtml(s.startTime||"")}</div>
+    </div>
+    <div class="center mt-3">
+      <div class="qr-box" id="qrTarget"></div>
+    </div>
+    <div class="center mt-3">
+      <div class="muted" style="font-size:12px;letter-spacing:1px">EXPIRES IN</div>
+      <div class="countdown" id="qrCountdown">--:--</div>
+    </div>
+    <div class="center mt-3" id="qrStats">
+      <div class="row" style="justify-content:center;gap:40px">
+        <div><div style="font-size:28px;font-weight:800" id="qrPresent">0</div><div class="muted" style="font-size:11px;letter-spacing:1px">PRESENT</div></div>
+        <div><div style="font-size:28px;font-weight:800" id="qrLate">0</div><div class="muted" style="font-size:11px;letter-spacing:1px">LATE</div></div>
+      </div>
+    </div>
+    <div class="row mt-3">
+      <button class="btn btn-ghost" id="qrFullscreenBtn">🖥 Fullscreen</button>
+      <button class="btn btn-ghost" id="qrViewBtn">📋 View</button>
+    </div>
+    <button class="btn btn-danger btn-block mt-2" id="qrCloseBtn">🔒 Close Attendance</button>
+  `;
+}
+
+function wireSessionActions(s, fullscreen){
+  const fsBtn = $("#qrFullscreenBtn");
+  if (fsBtn) fsBtn.onclick = ()=>{ closeModal(); openFullscreenQR(s.id); };
+  const viewBtn = $("#qrViewBtn");
+  if (viewBtn) viewBtn.onclick = ()=>{ closeModal(); navigate("records"); };
+  const closeBtn = $("#qrCloseBtn");
+  if (closeBtn) closeBtn.onclick = ()=>{
+    confirmDialog(
+      "Close Attendance",
+      "Are you sure you want to close this attendance session? Members will no longer be able to scan it.",
+      ()=>closeAttendance(s.id),
+      "Close Session",
+      true
+    );
+  };
+}
+
+function startCountdown(s, fullscreen){
+  const tick = ()=>{
+    const el = $("#qrCountdown");
+    if (!el) return;
+    const exp = s.expiresAt?.toDate ? s.expiresAt.toDate() : new Date(s.expiresAt);
+    const diff = exp - new Date();
+    if (diff <= 0){
+      el.textContent = "EXPIRED";
+      el.classList.add("expired");
+      return;
+    }
+    const mm = String(Math.floor(diff/60000)).padStart(2,"0");
+    const ss = String(Math.floor((diff%60000)/1000)).padStart(2,"0");
+    el.textContent = `${mm}:${ss}`;
+  };
+  tick();
+  state.countdownTimer = setInterval(tick, 1000);
+}
+
+function subscribeSessionStats(sessionId){
+  const q = collection(db,"attendanceSessions",sessionId,"records");
+  const unsub = onSnapshot(q, snap=>{
+    let present=0, late=0;
+    snap.forEach(d=>{
+      const st = d.data().status;
+      if (st==="Present") present++;
+      else if (st==="Late") late++;
+    });
+    const pe = $("#qrPresent"); if (pe) pe.textContent = present;
+    const le = $("#qrLate");    if (le) le.textContent = late;
+  }, err=>console.error("stats:",err));
+  state.unsubscribers.push(unsub);
+}
+
+function openFullscreenQR(sessionId){
+  // Render a fullscreen overlay separate from modal
+  const wrap = document.createElement("div");
+  wrap.id = "qrFullscreen";
+  wrap.innerHTML = `
+    <button class="btn btn-ghost btn-sm fs-exit" id="fsExit">✕ Exit</button>
+    <div class="fs-head" id="fsHead">CHOIR ATTENDANCE</div>
+    <div class="fs-activity" id="fsActivity">—</div>
+    <div class="fs-name" id="fsName">—</div>
+    <div class="fs-qr" id="fsQr"></div>
+    <div class="fs-stats">
+      <div class="fs-stat"><div class="n" id="fsPresent">0</div><div class="l">Present</div></div>
+      <div class="fs-stat"><div class="n" id="fsLate">0</div><div class="l">Late</div></div>
+    </div>
+    <div class="fs-timer" id="fsTimer">--:--</div>
+  `;
+  document.body.appendChild(wrap);
+  $("#fsExit").onclick = ()=> wrap.remove();
+
+  getDoc(doc(db,"attendanceSessions",sessionId)).then(snap=>{
+    if (!snap.exists()){ toast("Session not found.","error"); wrap.remove(); return; }
+    const s = { id: snap.id, ...snap.data() };
+    $("#fsActivity").innerHTML = `${activityIcon(s.activityType)} ${escapeHtml(activityShort(s.activityType).toUpperCase())}`;
+    $("#fsName").textContent = s.sessionName;
+
+    const qrEl = $("#fsQr");
+    qrEl.innerHTML = "";
+    new QRCode(qrEl, {
+      text: JSON.stringify({ sessionId: s.id }),
+      width: 340, height: 340,
+      colorDark: "#050B16", colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M
+    });
+
+    // Countdown
+    const timerEl = $("#fsTimer");
+    const update = ()=>{
+      const exp = s.expiresAt?.toDate ? s.expiresAt.toDate() : new Date(s.expiresAt);
+      const diff = exp - new Date();
+      if (diff <= 0){ timerEl.textContent = "EXPIRED"; timerEl.style.color = "var(--red)"; return; }
+      const mm = String(Math.floor(diff/60000)).padStart(2,"0");
+      const ss = String(Math.floor((diff%60000)/1000)).padStart(2,"0");
+      timerEl.textContent = `Expires in ${mm}:${ss}`;
+    };
+    update();
+    const intv = setInterval(update, 1000);
+    const cleanup = new MutationObserver(()=>{
+      if (!document.body.contains(wrap)){ clearInterval(intv); unsub(); cleanup.disconnect(); }
+    });
+    cleanup.observe(document.body, {childList:true});
+
+    // Live stats
+    const unsub = onSnapshot(collection(db,"attendanceSessions",s.id,"records"), snap=>{
+      let p=0,l=0;
+      snap.forEach(d=>{ const st=d.data().status; if(st==="Present")p++; else if(st==="Late")l++; });
+      $("#fsPresent").textContent = p;
+      $("#fsLate").textContent = l;
+    });
+  });
+}
+
+/* ============================================================
+   CLOSE ATTENDANCE
+   ============================================================ */
+async function closeAttendance(sessionId){
+  try{
+    await updateDoc(doc(db,"attendanceSessions",sessionId), {
+      status:"closed",
+      closedAt: serverTimestamp(),
+      closedBy: state.user.uid
+    });
+    toast("Attendance session closed.", "success");
+    if ($("#qrCountdown")) closeModal();
+  }catch(e){
+    console.error(e);
+    toast("Could not close session.", "error");
+  }
+}
+
+/* ============================================================
+   QR SCANNER (MEMBER + ADMIN)
+   ============================================================ */
+async function openScanner(){
+  const wrap = document.createElement("div");
+  wrap.id = "scannerWrap";
+  wrap.innerHTML = `
+    <div class="sc-head">
+      <div style="font-weight:700">📷 Scan Attendance QR</div>
+      <button class="btn btn-ghost btn-sm" id="scanClose">Cancel</button>
+    </div>
+    <div id="reader"><div class="scan-frame"></div><div class="scan-hint">Point your camera at the session QR code</div></div>
+  `;
+  document.body.appendChild(wrap);
+  $("#scanClose").onclick = ()=> closeScanner();
+
+  try{
+    const scanner = new Html5Qrcode("reader");
+    state.scanner = scanner;
+    await scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 260, height: 260 } },
+      onScanSuccess,
+      ()=>{}
+    );
+  }catch(e){
+    console.error(e);
+    closeScanner();
+    toast("Camera unavailable or permission denied.", "error");
+  }
+}
+
+function closeScanner(){
+  const wrap = $("#scannerWrap");
+  if (state.scanner){
+    state.scanner.stop().then(()=>{
+      try{ state.scanner.clear(); }catch(e){}
+      state.scanner = null;
+    }).catch(()=>{ state.scanner = null; });
+  }
+  if (wrap) wrap.remove();
+}
+
+let scanLock = false;
+async function onScanSuccess(decodedText){
+  if (scanLock) return;
+  scanLock = true;
+  try{
+    const data = JSON.parse(decodedText);
+    if (!data.sessionId) throw new Error("invalid");
+    closeScanner();
+    await recordAttendance(data.sessionId);
+  }catch(e){
+    toast("Invalid QR code.", "error");
+    scanLock = false;
+  }
+}
+
+/* ============================================================
+   RECORD ATTENDANCE (member scans QR)
+   ============================================================ */
+async function recordAttendance(sessionId){
+  try{
+    const ref = doc(db,"attendanceSessions",sessionId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()){ return scanResult("❌","Invalid session","This QR code does not match any session."); }
+    const s = snap.data();
+
+    if (s.status === "closed"){
+      return scanResult("🔒","Attendance is closed","The admin has closed this session.");
+    }
+
+    const exp = s.expiresAt?.toDate ? s.expiresAt.toDate() : new Date(s.expiresAt);
+    if (exp < new Date()){
+      return scanResult("⏰","This attendance session has expired","Please ask the admin for a fresh QR code.");
+    }
+
+    // Duplicate check — document ID is uid
+    const recRef = doc(db,"attendanceSessions",sessionId,"records",state.user.uid);
+    const existing = await getDoc(recRef);
+    if (existing.exists()){
+      return scanResult("ℹ️","You have already checked in for this session","Activity: "+ (s.activityType||""), "info");
+    }
+
+    // Late logic: >15 minutes after start → Late
+    const start = s.startsAt?.toDate ? s.startsAt.toDate() : new Date(s.startsAt);
+    const now = new Date();
+    const status = (now - start) > 15*60*1000 ? "Late" : "Present";
+
+    await setDoc(recRef, {
+      uid: state.user.uid,
+      memberName: state.profile.fullName,
+      activityType: s.activityType,
+      sessionId: sessionId,
+      sessionName: s.sessionName,
+      status: status,
+      timestamp: serverTimestamp()
+    });
+
+    scanResult("✅","Attendance Recorded",
+      `Activity: ${activityShort(s.activityType)}<br>Time: ${fmtTime(now)}<br>Status: <b>${status}</b>`,
+      "success");
+    scanLock = false;
+  }catch(e){
+    console.error(e);
+    scanResult("⚠️","Could not record attendance","Please check your connection and try again.","error");
+    scanLock = false;
+  }
+}
+
+function scanResult(icon, title, body, kind="success"){
+  openModal(`
+    <div class="modal-head">
+      <h2>${icon} ${escapeHtml(title)}</h2>
+      <button class="modal-close">✕</button>
+    </div>
+    <div style="text-align:center;padding:18px 0">
+      <div style="font-size:52px;margin-bottom:14px">${icon}</div>
+      <div style="font-size:15px;color:var(--muted);line-height:1.7">${body}</div>
+    </div>
+    <button class="btn btn-primary btn-block" id="scanOkBtn">Done</button>
+  `, {onClose:()=>{ scanLock=false; }});
+  $("#scanOkBtn").onclick = ()=>closeModal(()=>{ scanLock=false; });
+}
+
+/* ============================================================
+   ATTENDANCE RECORDS (ADMIN)
+   ============================================================ */
+let recordsState = {
+  activity: "Amateraniro",
+  sessions: [],
+  selectedSessionId: null,
+  records: [],
+  search: "",
+  statusFilter: "",
+  dateFilter: ""
+};
+
+async function renderAttendanceRecords(){
+  const el = $("#page-records");
+  el.innerHTML = `
+    <div class="page-head">
+      <h1>Attendance Records</h1>
+      <p>Browse records by activity. Amateraniro, Practice and Other Part are kept separate.</p>
+    </div>
+
+    <div class="tabs" id="recTabs">
+      <button class="tab" data-act="Amateraniro">🙏 Amateraniro</button>
+      <button class="tab" data-act="Practice">🎵 Practice</button>
+      <button class="tab" data-act="Choir Other Part">🎤 Other Part</button>
+    </div>
+
+    <div class="filter-bar">
+      <select id="recSession"></select>
+      <input type="date" id="recDate" />
+      <select id="recStatus">
+        <option value="">All statuses</option>
+        <option>Present</option><option>Late</option><option>Excused</option><option>Absent</option>
+      </select>
+      <input type="text" id="recSearch" placeholder="🔍 Search member..." />
+      <button class="btn btn-ghost btn-sm" id="recClear">Clear</button>
+      <button class="btn btn-ghost btn-sm" id="recExport">⬇ CSV</button>
+      <button class="btn btn-ghost btn-sm" id="recPrint">🖨 Print</button>
+    </div>
+
+    <div id="recSummary"></div>
+    <div id="recList"><div class="center" style="padding:30px"><span class="spinner"></span></div></div>
+  `;
+
+  $$("#recTabs .tab").forEach(t=>{
+    t.onclick = ()=>{
+      $$("#recTabs .tab").forEach(x=>x.classList.remove("active"));
+      t.classList.add("active");
+      recordsState.activity = t.dataset.act;
+      recordsState.selectedSessionId = null;
+      loadSessionsForActivity();
+    };
+  });
+
+  $("#recSession").onchange  = e=>{ recordsState.selectedSessionId = e.target.value || null; loadRecords(); };
+  $("#recDate").onchange     = e=>{ recordsState.dateFilter = e.target.value; loadRecords(); };
+  $("#recStatus").onchange   = e=>{ recordsState.statusFilter = e.target.value; loadRecords(); };
+  $("#recSearch").oninput    = e=>{ recordsState.search = e.target.value.toLowerCase(); renderRecordsList(); };
+  $("#recClear").onclick     = ()=>{
+    recordsState.search=""; recordsState.statusFilter=""; recordsState.dateFilter="";
+    recordsState.selectedSessionId=null;
+    $("#recSearch").value=""; $("#recStatus").value=""; $("#recDate").value=""; $("#recSession").value="";
+    loadRecords();
+  };
+  $("#recExport").onclick = exportCSV;
+  $("#recPrint").onclick  = ()=>window.print();
+
+  // Mark active tab
+  $$("#recTabs .tab").forEach(t=> t.classList.toggle("active", t.dataset.act===recordsState.activity));
+
+  loadSessionsForActivity();
+}
+
+async function loadSessionsForActivity(){
+  try{
+    const q = query(
+      collection(db,"attendanceSessions"),
+      where("activityType","==",recordsState.activity),
+      orderBy("createdAt","desc")
+    );
+    const snap = await getDocs(q);
+    recordsState.sessions = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    const sel = $("#recSession");
+    sel.innerHTML = `<option value="">All sessions (${recordsState.sessions.length})</option>` +
+      recordsState.sessions.map(s=>
+        `<option value="${s.id}">${escapeHtml(s.sessionName)} — ${s.date||""} ${s.startTime||""}${s.status==="closed"?" (closed)":""}</option>`
+      ).join("");
+    recordsState.selectedSessionId = null;
+    loadRecords();
+  }catch(e){
+    console.error(e);
+    toast("Failed to load sessions. Ensure a Firestore index exists for activityType+createdAt.","error",5000);
+  }
+}
+
+async function loadRecords(){
+  try{
+    const listEl = $("#recList");
+    listEl.innerHTML = `<div class="center" style="padding:30px"><span class="spinner"></span></div>`;
+
+    let records = [];
+    if (recordsState.selectedSessionId){
+      const snap = await getDocs(collection(db,"attendanceSessions",recordsState.selectedSessionId,"records"));
+      records = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      // Attach session info
+      const s = recordsState.sessions.find(x=>x.id===recordsState.selectedSessionId);
+      if (s) records.forEach(r=>{ r._session = s; });
+    } else {
+      // Load all records across this activity's sessions
+      const all = [];
+      for (const s of recordsState.sessions){
+        const snap = await getDocs(collection(db,"attendanceSessions",s.id,"records"));
+        snap.forEach(d=> all.push({id:d.id, ...d.data(), _session:s}));
+      }
+      records = all;
+    }
+
+    // Also include any missing members from the selected session as "Absent"
+    // (only when a specific session is chosen — matches the example table)
+    if (recordsState.selectedSessionId){
+      const session = recordsState.sessions.find(x=>x.id===recordsState.selectedSessionId);
+      if (session){
+        try{
+          const usersSnap = await getDocs(query(collection(db,"users"), where("role","==","member")));
+          const recordedUids = new Set(records.map(r=>r.uid));
+          usersSnap.forEach(u=>{
+            if (!recordedUids.has(u.id)){
+              records.push({
+                id: u.id,
+                uid: u.id,
+                memberName: u.data().fullName || "Unknown",
+                activityType: session.activityType,
+                sessionId: session.id,
+                sessionName: session.sessionName,
+                status: "Absent",
+                timestamp: null,
+                _session: session,
+                _isAbsent: true
+              });
+            }
+          });
+        }catch(e){ console.error("absent lookup:", e); }
+      }
+    }
+
+    recordsState.records = records;
+    renderRecordsList();
+  }catch(e){
+    console.error(e);
+    $("#recList").innerHTML = `<div class="empty"><div class="e-ico">⚠️</div><div class="e-title">Could not load records</div><div class="e-sub">${escapeHtml(e.message||"")}</div></div>`;
+  }
+}
+
+function renderRecordsList(){
+  const listEl = $("#recList");
+  const summaryEl = $("#recSummary");
+
+  let recs = recordsState.records.slice();
+
+  // Filters
+  if (recordsState.search){
+    recs = recs.filter(r => (r.memberName||"").toLowerCase().includes(recordsState.search));
+  }
+  if (recordsState.statusFilter){
+    recs = recs.filter(r => r.status === recordsState.statusFilter);
+  }
+  if (recordsState.dateFilter){
+    recs = recs.filter(r => (r._session?.date || "") === recordsState.dateFilter);
+  }
+
+  // Summary
+  const session = recordsState.selectedSessionId
+    ? recordsState.sessions.find(x=>x.id===recordsState.selectedSessionId) : null;
+
+  if (session){
+    const total = recs.length;
+    const present = recs.filter(r=>r.status==="Present").length;
+    const late    = recs.filter(r=>r.status==="Late").length;
+    const absent  = recs.filter(r=>r.status==="Absent").length;
+    const excused = recs.filter(r=>r.status==="Excused").length;
+    summaryEl.innerHTML = `
+      <div class="glass card" style="margin-bottom:14px">
+        <div style="display:flex;flex-wrap:wrap;gap:14px;justify-content:space-between">
+          <div>
+            <div style="font-size:12px;color:var(--muted);letter-spacing:1px;text-transform:uppercase">${escapeHtml(activityShort(session.activityType))} Attendance</div>
+            <div style="font-size:18px;font-weight:800;margin-top:4px">${escapeHtml(session.sessionName)}</div>
+            <div class="muted" style="font-size:13px;margin-top:2px">${escapeHtml(session.date||"")} · ${escapeHtml(session.startTime||"")}${session.status==="closed"?' · <span class="badge badge-red">closed</span>':' <span class="badge badge-green">open</span>'}</div>
+          </div>
+          <div style="display:flex;gap:22px;flex-wrap:wrap">
+            <div class="center"><div style="font-size:22px;font-weight:800">${total}</div><div class="muted" style="font-size:11px">TOTAL</div></div>
+            <div class="center"><div style="font-size:22px;font-weight:800;color:var(--green)">${present}</div><div class="muted" style="font-size:11px">PRESENT</div></div>
+            <div class="center"><div style="font-size:22px;font-weight:800;color:var(--yellow)">${late}</div><div class="muted" style="font-size:11px">LATE</div></div>
+            <div class="center"><div style="font-size:22px;font-weight:800;color:var(--red)">${absent}</div><div class="muted" style="font-size:11px">ABSENT</div></div>
+            <div class="center"><div style="font-size:22px;font-weight:800;color:var(--blue)">${excused}</div><div class="muted" style="font-size:11px">EXCUSED</div></div>
+          </div>
+        </div>
+      </div>
+    `;
+  } else {
+    summaryEl.innerHTML = "";
+  }
+
+  if (!recs.length){
+    listEl.innerHTML = `<div class="glass card empty"><div class="e-ico">📋</div><div class="e-title">No attendance records</div><div class="e-sub">Create your first attendance session for this activity.</div></div>`;
+    return;
+  }
+
+  // Sort: present/late first by timestamp, absent last
+  recs.sort((a,b)=>{
+    if (a._isAbsent && !b._isAbsent) return 1;
+    if (!a._isAbsent && b._isAbsent) return -1;
+    const ta = a.timestamp?.toDate?.() || 0;
+    const tb = b.timestamp?.toDate?.() || 0;
+    return ta - tb;
+  });
+
+  // Desktop table
+  const isDesktop = window.innerWidth >= 900;
+  if (isDesktop){
+    listEl.innerHTML = `
+      <div class="glass card">
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr>
+              <th>#</th><th>Member</th><th>Activity</th><th>Date</th><th>Time</th>
+              <th>Status</th><th>Session</th><th>Actions</th>
+            </tr></thead>
+            <tbody>
+              ${recs.map((r,i)=>{
+                const ts = r.timestamp?.toDate ? r.timestamp.toDate() : r.timestamp;
+                const dateStr = r._session?.date || (ts?new Date(ts).toISOString().slice(0,10):"—");
+                const timeStr = ts ? fmtTime(ts) : "—";
+                return `<tr>
+                  <td>${i+1}</td>
+                  <td><b>${escapeHtml(r.memberName||"—")}</b></td>
+                  <td>${activityIcon(r.activityType)} ${escapeHtml(activityShort(r.activityType||""))}</td>
+                  <td>${escapeHtml(dateStr)}</td>
+                  <td>${escapeHtml(timeStr)}</td>
+                  <td>${statusBadge(r.status)}</td>
+                  <td class="muted" style="font-size:12px">${escapeHtml(r._session?.sessionName||r.sessionName||"—")}</td>
+                  <td>
+                    <button class="btn btn-ghost btn-sm" data-edit="${r.id}">✏️</button>
+                    <button class="btn btn-ghost btn-sm" data-del="${r.id}" ${r._isAbsent?"disabled":""}>🗑</button>
+                  </td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  } else {
+    listEl.innerHTML = recs.map((r,i)=>{
+      const ts = r.timestamp?.toDate ? r.timestamp.toDate() : r.timestamp;
+      const timeStr = ts ? fmtTime(ts) : "—";
+      const dateStr = r._session?.date || "";
+      return `
+        <div class="glass rec-card">
+          <div class="rc-main">
+            <div class="rc-name">${i+1}. ${escapeHtml(r.memberName||"—")}</div>
+            <div class="rc-meta">${activityIcon(r.activityType)} ${escapeHtml(activityShort(r.activityType||""))} · ${escapeHtml(dateStr)} · ${timeStr}</div>
+            <div class="rc-meta" style="margin-top:4px">${escapeHtml(r._session?.sessionName||r.sessionName||"")}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+            ${statusBadge(r.status)}
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-ghost btn-sm" data-edit="${r.id}">✏️</button>
+              <button class="btn btn-ghost btn-sm" data-del="${r.id}" ${r._isAbsent?"disabled":""}>🗑</button>
+            </div>
+          </div>
+        </div>`;
+    }).join("");
+  }
+
+  // Wire row actions
+  $$("[data-edit]").forEach(b=> b.onclick = ()=> editRecord(b.dataset.edit));
+  $$("[data-del]").forEach(b=> b.onclick = ()=> deleteRecord(b.dataset.del));
+}
+
+async function editRecord(recordId){
+  const r = recordsState.records.find(x=>x.id===recordId);
+  if (!r) return;
+  if (!r.sessionId){ return toast("This member has no record yet — marking status will create one.", "info"); }
+
+  openModal(`
+    <div class="modal-head">
+      <h2>Edit Attendance</h2>
+      <button class="modal-close">✕</button>
+    </div>
+    <div class="field">
+      <label>Member</label>
+      <input type="text" value="${escapeHtml(r.memberName)}" disabled />
+    </div>
+    <div class="field">
+      <label>Status</label>
+      <select id="editStatus">
+        ${["Present","Late","Excused","Absent"].map(s=>`<option ${s===r.status?"selected":""}>${s}</option>`).join("")}
+      </select>
+    </div>
+    <button class="btn btn-primary btn-block" id="editSave">Save</button>
+  `);
+  $("#editSave").onclick = async ()=>{
+    try{
+      await updateDoc(doc(db,"attendanceSessions",r.sessionId,"records",recordId), {
+        status: $("#editStatus").value,
+        editedBy: state.user.uid,
+        editedAt: serverTimestamp()
+      });
+      toast("Status updated.","success");
+      closeModal();
+      loadRecords();
+    }catch(e){ console.error(e); toast("Could not update.","error"); }
+  };
+}
+
+async function deleteRecord(recordId){
+  const r = recordsState.records.find(x=>x.id===recordId);
+  if (!r || !r.sessionId) return;
+  confirmDialog("Delete Record", `Delete attendance record for ${r.memberName}?`, async ()=>{
+    try{
+      await deleteDoc(doc(db,"attendanceSessions",r.sessionId,"records",recordId));
+      toast("Record deleted.","success");
+      loadRecords();
+    }catch(e){ console.error(e); toast("Could not delete.","error"); }
+  }, "Delete", true);
+}
+
+/* ============================================================
+   EXPORT CSV
+   ============================================================ */
+function exportCSV(){
+  const recs = recordsState.records.filter(r=>{
+    if (recordsState.search && !(r.memberName||"").toLowerCase().includes(recordsState.search)) return false;
+    if (recordsState.statusFilter && r.status!==recordsState.statusFilter) return false;
+    if (recordsState.dateFilter && (r._session?.date||"")!==recordsState.dateFilter) return false;
+    return true;
+  });
+  if (!recs.length){ toast("No records to export.","error"); return; }
+
+  const rows = [["#","Member","Activity","Session","Date","Time","Status"]];
+  recs.forEach((r,i)=>{
+    const ts = r.timestamp?.toDate ? r.timestamp.toDate() : r.timestamp;
+    rows.push([
+      i+1,
+      r.memberName||"",
+      r.activityType||"",
+      r._session?.sessionName||r.sessionName||"",
+      r._session?.date||"",
+      ts?fmtTime(ts):"",
+      r.status||""
+    ]);
+  });
+  const csv = rows.map(row=>row.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `attendance_${recordsState.activity.replace(/\s+/g,"_")}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast("CSV downloaded.","success");
+}
+
+/* ============================================================
+   MEMBERS (ADMIN)
+   ============================================================ */
+async function renderMembers(){
+  const el = $("#page-members");
+  el.innerHTML = `
+    <div class="page-head">
+      <h1>Members</h1>
+      <p>Manage choir members and view their attendance.</p>
+    </div>
+    <div class="filter-bar">
+      <input type="text" id="memSearch" placeholder="🔍 Search by name, phone or email..." />
+    </div>
+    <div id="memList"><div class="center" style="padding:30px"><span class="spinner"></span></div></div>
+  `;
+
+  let allMembers = [];
+  try{
+    const snap = await getDocs(collection(db,"users"));
+    allMembers = snap.docs.map(d=>({id:d.id, ...d.data()}));
+
+    // Attendance totals per member
+    const recSnap = await getDocs(collectionGroup(db,"records"));
+    const countByUid = {};
+    recSnap.forEach(d=>{
+      const r = d.data();
+      if (!countByUid[r.uid]) countByUid[r.uid] = {total:0, attended:0};
+      countByUid[r.uid].total++;
+      if (r.status==="Present"||r.status==="Late") countByUid[r.uid].attended++;
+    });
+
+    // Total sessions
+    const sessSnap = await getDocs(collection(db,"attendanceSessions"));
+    const totalSessions = sessSnap.size;
+
+    renderMembersList(allMembers, countByUid, totalSessions);
+  }catch(e){
+    console.error(e);
+    $("#memList").innerHTML = `<div class="empty"><div class="e-ico">⚠️</div><div class="e-title">Could not load members</div><div class="e-sub">${escapeHtml(e.message||"")}</div></div>`;
+  }
+
+  $("#memSearch").oninput = e=>{
+    const q = e.target.value.toLowerCase();
+    $$("#memList .rec-card, #memList tr").forEach(el=>{
+      const t = el.textContent.toLowerCase();
+      el.style.display = t.includes(q) ? "" : "none";
+    });
+  };
+}
+
+function renderMembersList(members, countByUid, totalSessions){
+  if (!members.length){
+    $("#memList").innerHTML = `<div class="glass card empty"><div class="e-ico">👥</div><div class="e-title">No members yet</div><div class="e-sub">Members will appear after they register.</div></div>`;
+    return;
+  }
+  const isDesktop = window.innerWidth >= 900;
+  if (isDesktop){
+    $("#memList").innerHTML = `
+      <div class="glass card">
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Role</th><th>Joined</th><th>Attendance</th><th></th></tr></thead>
+            <tbody>
+              ${members.map(m=>{
+                const stats = countByUid[m.uid] || {attended:0};
+                const pct = totalSessions ? Math.round((stats.attended/totalSessions)*100) : 0;
+                const created = m.createdAt?.toDate ? m.createdAt.toDate() : m.createdAt;
+                return `<tr>
+                  <td><b>${escapeHtml(m.fullName||"—")}</b></td>
+                  <td>${escapeHtml(m.phone||"—")}</td>
+                  <td class="muted">${escapeHtml(m.email||"—")}</td>
+                  <td>${m.role==="admin"?'<span class="badge badge-purple">Admin</span>':'<span class="badge badge-cyan">Member</span>'}</td>
+                  <td class="muted">${created?fmtDate(created):"—"}</td>
+                  <td>${pct}%</td>
+                  <td><button class="btn btn-ghost btn-sm" data-member="${m.id}">View</button></td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  } else {
+    $("#memList").innerHTML = members.map(m=>{
+      const stats = countByUid[m.uid] || {attended:0};
+      const pct = totalSessions ? Math.round((stats.attended/totalSessions)*100) : 0;
+      return `
+        <div class="glass rec-card" data-member-card>
+          <div class="rc-main">
+            <div class="rc-name">${escapeHtml(m.fullName||"—")}</div>
+            <div class="rc-meta">${escapeHtml(m.phone||"")} ${m.email?"· "+escapeHtml(m.email):""}</div>
+            <div class="rc-meta" style="margin-top:4px">
+              ${m.role==="admin"?'<span class="badge badge-purple">Admin</span>':'<span class="badge badge-cyan">Member</span>'}
+              · Attendance ${pct}%
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm" data-member="${m.id}">View</button>
+        </div>`;
+    }).join("");
+  }
+
+  $$("[data-member]").forEach(b=>{
+    b.onclick = ()=> viewMember(b.dataset.member, members, countByUid, totalSessions);
+  });
+}
+
+async function viewMember(uid, members, countByUid, totalSessions){
+  const m = members.find(x=>x.id===uid);
+  if (!m) return;
+
+  // Load this member's records
+  const recSnap = await getDocs(query(collectionGroup(db,"records"), where("uid","==",uid)));
+  const records = recSnap.docs.map(d=>d.data());
+
+  const byAct = { "Amateraniro":0, "Practice":0, "Choir Other Part":0 };
+  const sessSnap = await getDocs(collection(db,"attendanceSessions"));
+  const sessByAct = { "Amateraniro":0, "Practice":0, "Choir Other Part":0 };
+  sessSnap.forEach(d=>{ const a=d.data().activityType; if (sessByAct[a]!==undefined) sessByAct[a]++; });
+  records.forEach(r=>{ if (byAct[r.activityType]!==undefined && (r.status==="Present"||r.status==="Late")) byAct[r.activityType]++; });
+
+  const created = m.createdAt?.toDate ? m.createdAt.toDate() : m.createdAt;
+
+  openModal(`
+    <div class="modal-head">
+      <h2>${escapeHtml(m.fullName||"—")}</h2>
+      <button class="modal-close">✕</button>
+    </div>
+    <div class="center" style="margin-bottom:18px">
+      <div class="avatar" style="width:64px;height:64px;font-size:22px;margin:0 auto">${escapeHtml(initials(m.fullName))}</div>
+    </div>
+    <div style="font-size:14px;line-height:1.9">
+      <div><span class="muted">Phone:</span> ${escapeHtml(m.phone||"—")}</div>
+      <div><span class="muted">Email:</span> ${escapeHtml(m.email||"—")}</div>
+      <div><span class="muted">Role:</span> ${m.role==="admin"?"Admin / Leader":"Member"}</div>
+      <div><span class="muted">Joined:</span> ${created?fmtDate(created):"—"}</div>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--border);margin:16px 0" />
+    <div style="font-weight:700;margin-bottom:10px">Attendance Breakdown</div>
+    <div class="seg-row">
+      <span>🙏 Amateraniro</span>
+      <b>${sessByAct.Amateraniro?Math.round((byAct.Amateraniro/sessByAct.Amateraniro)*100):0}%</b>
+    </div>
+    <div class="seg-row">
+      <span>🎵 Practice</span>
+      <b>${sessByAct.Practice?Math.round((byAct.Practice/sessByAct.Practice)*100):0}%</b>
+    </div>
+    <div class="seg-row">
+      <span>🎤 Other Part</span>
+      <b>${sessByAct["Choir Other Part"]?Math.round((byAct["Choir Other Part"]/sessByAct["Choir Other Part"])*100):0}%</b>
+    </div>
+    <div class="mt-2" style="font-weight:700">Recent Records</div>
+    <div class="mt-1">
+      ${records.length ? records.slice(-5).reverse().map(r=>{
+        const ts = r.timestamp?.toDate ? r.timestamp.toDate() : r.timestamp;
+        return `<div class="rec-card"><div class="rc-main">
+          <div class="rc-name">${activityIcon(r.activityType)} ${escapeHtml(activityShort(r.activityType||""))}</div>
+          <div class="rc-meta">${ts?fmtDateTime(ts):"—"}</div>
+        </div>${statusBadge(r.status)}</div>`;
+      }).join("") : `<div class="muted" style="padding:12px 0">No records yet.</div>`}
+    </div>
+  `);
+}
+
+/* ============================================================
+   REPORTS (ADMIN)
+   ============================================================ */
+async function renderReports(){
+  const el = $("#page-reports");
+  el.innerHTML = `
+    <div class="page-head">
+      <h1>Reports</h1>
+      <p>Real statistics from your Firestore data.</p>
+    </div>
+
+    <div class="grid grid-3" id="reportCards">
+      <div class="glass card"><div class="center" style="padding:20px"><span class="spinner"></span></div></div>
+    </div>
+
+    <div class="glass card mt-3">
+      <h3><span class="ico">📊</span> Attendance by Activity</h3>
+      <div style="position:relative;height:260px"><canvas id="chartActivity"></canvas></div>
+    </div>
+
+    <div class="glass card mt-3">
+      <h3><span class="ico">📈</span> Present / Late / Absent</h3>
+      <div style="position:relative;height:260px"><canvas id="chartStatus"></canvas></div>
+    </div>
+
+    <div class="glass card mt-3">
+      <h3><span class="ico">🏆</span> Most Active Members</h3>
+      <div id="topMembers"><div class="center" style="padding:20px"><span class="spinner"></span></div></div>
+    </div>
+
+    <div class="glass card mt-3">
+      <h3><span class="ico">⚠️</span> Low Attendance Members</h3>
+      <div id="lowMembers"><div class="center" style="padding:20px"><span class="spinner"></span></div></div>
+    </div>
+  `;
+
+  try{
+    const sessSnap = await getDocs(collection(db,"attendanceSessions"));
+    const sessions = sessSnap.docs.map(d=>({id:d.id, ...d.data()}));
+    const usersSnap = await getDocs(query(collection(db,"users"), where("role","==","member")));
+    const members = usersSnap.docs.map(d=>({id:d.id, ...d.data()}));
+
+    const recSnap = await getDocs(collectionGroup(db,"records"));
+    const records = recSnap.docs.map(d=>d.data());
+
+    // ---- Overall stats by activity ----
+    const activities = ["Amateraniro","Practice","Choir Other Part"];
+    const sessByAct = {"Amateraniro":0,"Practice":0,"Choir Other Part":0};
+    sessions.forEach(s=>{ if (sessByAct[s.activityType]!==undefined) sessByAct[s.activityType]++; });
+
+    const attendedByAct = {"Amateraniro":0,"Practice":0,"Choir Other Part":0};
+    const totalsByAct   = {"Amateraniro":0,"Practice":0,"Choir Other Part":0}; // possible attendances
+    records.forEach(r=>{
+      const a = r.activityType;
+      if (attendedByAct[a]!==undefined && (r.status==="Present"||r.status==="Late")) attendedByAct[a]++;
+    });
+    const totalMembers = members.length;
+    const overallPossible = sessions.length * totalMembers;
+    const overallAttended = records.filter(r=>r.status==="Present"||r.status==="Late").length;
+    const overallRate = overallPossible ? Math.round((overallAttended/overallPossible)*100) : 0;
+
+    const rateOf = (a)=>{
+      const poss = sessByAct[a]*totalMembers;
+      return poss ? Math.round((attendedByAct[a]/poss)*100) : 0;
+    };
+
+    $("#reportCards").innerHTML = `
+      <div class="glass stat-card"><div class="ico" style="background:rgba(0,229,255,.15)">📈</div><div class="label">Overall</div><div class="value">${overallRate}%</div></div>
+      <div class="glass stat-card"><div class="ico" style="background:rgba(34,197,94,.15)">🙏</div><div class="label">Amateraniro</div><div class="value">${rateOf("Amateraniro")}%</div></div>
+      <div class="glass stat-card"><div class="ico" style="background:rgba(59,130,246,.15)">🎵</div><div class="label">Practice</div><div class="value">${rateOf("Practice")}%</div></div>
+      <div class="glass stat-card"><div class="ico" style="background:rgba(168,85,247,.15)">🎤</div><div class="label">Other Part</div><div class="value">${rateOf("Choir Other Part")}%</div></div>
+    `;
+
+    // ---- Charts ----
+    drawActivityChart(sessByAct);
+    drawStatusChart(records);
+
+    // ---- Member ranking ----
+    const perMember = members.map(m=>{
+      const rs = records.filter(r=>r.uid===m.id);
+      const present = rs.filter(r=>r.status==="Present"||r.status==="Late").length;
+      const pct = sessions.length ? Math.round((present/sessions.length)*100) : 0;
+      return {name:m.fullName||"Unknown", uid:m.id, present, pct};
+    }).sort((a,b)=>b.present-a.present);
+
+    $("#topMembers").innerHTML = perMember.slice(0,5).map((m,i)=>`
+      <div class="seg-row">
+        <span>${["🥇","🥈","🥉","4️⃣","5️⃣"][i]} ${escapeHtml(m.name)}</span>
+        <b>${m.pct}%</b>
+      </div>
+    `).join("") || `<div class="muted" style="padding:12px 0">No member data yet.</div>`;
+
+    const low = perMember.slice().sort((a,b)=>a.pct-b.pct).filter(m=>m.pct < 50).slice(0,5);
+    $("#lowMembers").innerHTML = low.map(m=>`
+      <div class="seg-row">
+        <span>${escapeHtml(m.name)}</span>
+        <b style="color:var(--red)">${m.pct}%</b>
+      </div>
+    `).join("") || `<div class="muted" style="padding:12px 0">All members are above 50% 🎉</div>`;
+  }catch(e){
+    console.error(e);
+    toast("Could not load reports.","error");
+  }
+}
+
+function drawActivityChart(sessByAct){
+  const ctx = $("#chartActivity");
+  if (!ctx || !window.Chart) return;
+  state.charts.activity = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: ["Amateraniro","Practice","Other Part"],
+      datasets: [{
+        label: "Sessions",
+        data: [sessByAct.Amateraniro, sessByAct.Practice, sessByAct["Choir Other Part"]],
+        backgroundColor: ["#00E5FF","#3B82F6","#A855F7"],
+        borderRadius: 8
+      }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ticks:{color:"#8DA0BC"},grid:{display:false}},
+        y:{ticks:{color:"#8DA0BC"},grid:{color:"rgba(255,255,255,.05)"},beginAtZero:true}
+      }
+    }
+  });
+}
+
+function drawStatusChart(records){
+  const ctx = $("#chartStatus");
+  if (!ctx || !window.Chart) return;
+  const count = {Present:0,Late:0,Excused:0,Absent:0};
+  records.forEach(r=>{ if (count[r.status]!==undefined) count[r.status]++; });
+  state.charts.status = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: ["Present","Late","Excused","Absent"],
+      datasets: [{
+        data: [count.Present, count.Late, count.Excused, count.Absent],
+        backgroundColor: ["#22C55E","#F59E0B","#3B82F6","#EF4444"],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:"#8DA0BC"}}}
+    }
+  });
+}
+
+/* ============================================================
+   MY ATTENDANCE (MEMBER)
+   ============================================================ */
+async function renderMyAttendance(){
+  const el = $("#page-myattendance");
+  el.innerHTML = `
+    <div class="page-head">
+      <h1>My Attendance</h1>
+      <p>All of your personal attendance records.</p>
+    </div>
+    <div id="myList"><div class="center" style="padding:30px"><span class="spinner"></span></div></div>
+  `;
+  try{
+    const snap = await getDocs(query(collectionGroup(db,"records"), where("uid","==",state.user.uid)));
+    const records = snap.docs.map(d=>d.data()).sort((a,b)=>{
+      const ta = a.timestamp?.toDate?.() || 0;
+      const tb = b.timestamp?.toDate?.() || 0;
+      return tb-ta;
+    });
+
+    if (!records.length){
+      $("#myList").innerHTML = `<div class="glass card empty"><div class="e-ico">📋</div><div class="e-title">No records yet</div><div class="e-sub">Scan a QR code to check in.</div></div>`;
+      return;
+    }
+
+    const isDesktop = window.innerWidth >= 900;
+    if (isDesktop){
+      $("#myList").innerHTML = `
+        <div class="glass card">
+          <div class="table-wrap"><table class="data">
+            <thead><tr><th>Activity</th><th>Session</th><th>Date</th><th>Time</th><th>Status</th></tr></thead>
+            <tbody>${records.map(r=>{
+              const ts = r.timestamp?.toDate ? r.timestamp.toDate() : r.timestamp;
+              return `<tr>
+                <td>${activityIcon(r.activityType)} ${escapeHtml(activityShort(r.activityType||""))}</td>
+                <td>${escapeHtml(r.sessionName||"—")}</td>
+                <td>${ts?fmtDate(ts):"—"}</td>
+                <td>${ts?fmtTime(ts):"—"}</td>
+                <td>${statusBadge(r.status)}</td>
+              </tr>`;
+            }).join("")}</tbody>
+          </table></div>
+        </div>`;
+    } else {
+      $("#myList").innerHTML = records.map(r=>{
+        const ts = r.timestamp?.toDate ? r.timestamp.toDate() : r.timestamp;
+        return `
+          <div class="glass rec-card">
+            <div class="rc-main">
+              <div class="rc-name">${activityIcon(r.activityType)} ${escapeHtml(activityShort(r.activityType||""))}</div>
+              <div class="rc-meta">${escapeHtml(r.sessionName||"")}</div>
+              <div class="rc-meta">${ts?fmtDateTime(ts):"—"}</div>
+            </div>
+            ${statusBadge(r.status)}
+          </div>`;
+      }).join("");
+    }
+  }catch(e){
+    console.error(e);
+    $("#myList").innerHTML = `<div class="empty"><div class="e-ico">⚠️</div><div class="e-title">Could not load</div><div class="e-sub">${escapeHtml(e.message||"")}</div></div>`;
+  }
+}
+
+/* ============================================================
+   PROFILE
+   ============================================================ */
+function renderProfile(){
+  const el = $("#page-profile");
+  const p = state.profile;
+  const created = p.createdAt?.toDate ? p.createdAt.toDate() : p.createdAt;
+  el.innerHTML = `
+    <div class="page-head">
+      <h1>Profile</h1>
+      <p>Manage your personal information.</p>
+    </div>
+
+    <div class="glass card" style="max-width:520px">
+      <div class="center" style="margin-bottom:18px">
+        <div class="avatar" style="width:74px;height:74px;font-size:26px;margin:0 auto">${escapeHtml(initials(p.fullName))}</div>
+        <div style="font-weight:800;font-size:18px;margin-top:10px">${escapeHtml(p.fullName)}</div>
+        <div class="badge badge-cyan" style="margin-top:6px">${state.role==="admin"?"Admin / Leader":"Member"}</div>
+      </div>
+
+      <div class="field">
+        <label>Full Name</label>
+        <input type="text" id="profName" value="${escapeHtml(p.fullName||"")}" />
+      </div>
+      <div class="field">
+        <label>Phone Number</label>
+        <input type="tel" id="profPhone" value="${escapeHtml(p.phone||"")}" />
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" value="${escapeHtml(p.email||"")}" disabled />
+      </div>
+      <div class="field">
+        <label>Joined</label>
+        <input type="text" value="${created?fmtDate(created):"—"}" disabled />
+      </div>
+      <button class="btn btn-primary btn-block" id="profSave">Save Changes</button>
+      <button class="btn btn-ghost btn-block mt-2" id="profLogout">Logout</button>
+    </div>
+  `;
+
+  $("#profSave").onclick = async ()=>{
+    const name = $("#profName").value.trim();
+    const phone = $("#profPhone").value.trim();
+    if (!name) return toast("Name cannot be empty.","error");
+    try{
+      await updateDoc(doc(db,"users",state.user.uid), { fullName:name, phone:phone });
+      state.profile.fullName = name;
+      state.profile.phone = phone;
+      $("#topAvatar").textContent = initials(name);
+      toast("Profile updated.","success");
+    }catch(e){ console.error(e); toast("Could not save.","error"); }
+  };
+  $("#profLogout").onclick = ()=> confirmDialog("Logout","Are you sure you want to sign out?", logout, "Logout", true);
+}
+
+/* ============================================================
+   SETTINGS
+   ============================================================ */
+function renderSettings(){
+  const el = $("#page-settings");
+  el.innerHTML = `
+    <div class="page-head">
+      <h1>Settings</h1>
+      <p>App preferences and account options.</p>
+    </div>
+
+    <div class="glass card" style="max-width:520px">
+      <h3><span class="ico">ℹ️</span> About</h3>
+      <div class="seg-row"><span class="muted">Version</span><b>1.0.0</b></div>
+      <div class="seg-row"><span class="muted">Backend</span><b>Firebase</b></div>
+      <div class="seg-row"><span class="muted">Role</span><b>${state.role==="admin"?"Admin":"Member"}</b></div>
+      <div class="seg-row"><span class="muted">Account</span><b>${escapeHtml(state.profile.email||"")}</b></div>
+    </div>
+
+    <div class="glass card mt-3" style="max-width:520px">
+      <h3><span class="ico">🔐</span> Account</h3>
+      <button class="btn btn-ghost btn-block" id="setReset">Send Password Reset Email</button>
+      <button class="btn btn-danger btn-block mt-2" id="setLogout">Logout</button>
+    </div>
+
+    <p class="muted center mt-3" style="font-size:12px">Choir Attendance · Simple. Accurate. Connected.</p>
+  `;
+  $("#setReset").onclick = async ()=>{
+    try{
+      await sendPasswordResetEmail(auth, state.user.email);
+      toast("Reset email sent.","success");
+    }catch(e){ toast("Could not send email.","error"); }
+  };
+  $("#setLogout").onclick = ()=> confirmDialog("Logout","Are you sure you want to sign out?", logout, "Logout", true);
+}
+
+/* ============================================================
+   GLOBAL ERROR HANDLING
+   ============================================================ */
+window.addEventListener("unhandledrejection", (e)=>{
+  console.error("Unhandled:", e.reason);
+});
+window.addEventListener("online",  ()=> toast("Back online.","success"));
+window.addEventListener("offline", ()=> toast("You are offline.","error", 4000));
+
+/* Handle resize for record/member cards (re-render) */
+let resizeT = null;
+window.addEventListener("resize", ()=>{
+  clearTimeout(resizeT);
+  resizeT = setTimeout(()=>{
+    if (state.currentPage === "records") renderRecordsList();
+    if (state.currentPage === "members")  navigate("members");
+    if (state.currentPage === "myattendance") renderMyAttendance();
+  }, 250);
+});
+
+</script>
+</body>
+</html>
